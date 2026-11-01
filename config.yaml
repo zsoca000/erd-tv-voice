@@ -1,0 +1,26 @@
+# Minden beállítás egy helyen. A kimenet mellé kerülő .json rögzíti, mivel készült.
+
+model:
+  engine: f5
+  arch: F5TTS_v1_Base          # az F5-TTS beépített konfigurációja, amire a magyar súlyok épülnek
+  # Hugging Face hivatkozás (első futásnál letölt, ~1,3 GB), vagy helyi útvonal.
+  # Újabb modell: pl. hf://sarpba/F5-TTS_V1_hun_2509/model_302000.with_EMA.safetensors
+  ckpt: hf://sarpba/F5-TTS_V1_hun_v2/model_927900.safetensors
+  vocab: hf://sarpba/F5-TTS_V1_hun_v2/vocab.txt
+  device: auto                 # auto | cuda | cpu
+
+voice: panna                   # voices/<név>/ref.wav + ref.txt
+
+generation:
+  nfe_step: 32                 # több lépés = jobb minőség, lassabb (16–64)
+  cfg_strength: 2.0
+  sway_sampling_coef: -1.0
+  speed: 1.0
+  seed: 42                     # rögzített seed = megismételhető eredmény
+  pause_sec: 0.35              # szünet a mondatok között
+
+qa:
+  enabled: true
+  whisper_model: large-v3-turbo  # gyengébb gépen: medium vagy small
+  max_error: 0.10              # megengedett karakterhiba-arány mondatonként
+  max_tries: 4                 # ennyiszer próbál új seeddel, a legjobbat tartja meg

@@ -1,0 +1,30 @@
+[project]
+name = "bemondo"
+version = "0.1.0"
+description = "Magyar bemondószöveg generálás saját hangon (F5-TTS fölötti vékony réteg)"
+requires-python = ">=3.10"
+dependencies = [
+    "f5-tts==1.1.22",      # a keretrendszer; kipróbált verzió, tudatosan emeld (pip install -U f5-tts)
+    "gradio>=4.0",         # az egyszerűsített felülethez (bemondo ui)
+    "num2words",
+    "faster-whisper>=1.1", # referencia-átírás és minőségellenőrzés
+    "huggingface_hub",
+    "pydub",
+    "soundfile",
+    "numpy",
+    "pyyaml",
+]
+
+[project.scripts]
+bemondo = "bemondo.cli:main"
+bemondo-ui = "bemondo.ui:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["bemondo*"]
+
+[tool.setuptools.package-data]
+"bemondo.normaliser" = ["*.csv"]
