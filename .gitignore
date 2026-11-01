@@ -7,5 +7,4 @@ hungarian-tts/
 *.safetensors
 *.pt
 AI-hang.txt
-voices/*
-!voices/README.md
+voices/
