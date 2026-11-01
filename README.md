@@ -1,74 +1,110 @@
-# Bemondó – magyar bemondószöveg saját hangon
+# Bemondó – Hungarian TV announcer voice (voice-cloned TTS)
 
-Vékony réteg az [F5-TTS](https://github.com/SWivid/F5-TTS) fölött, [sarpba](https://huggingface.co/sarpba) magyar
-modellsúlyaival. A keretrendszer PyPI-ról, a súlyok Hugging Face-ről jönnek automatikusan; ez a repo csak a saját
-kódot, a kiejtési szótárat és a hangokat tartalmazza.
+Generates Hungarian announcement audio in a given person's voice from plain text.
+A thin layer on top of [F5-TTS](https://github.com/SWivid/F5-TTS) with [sarpba](https://huggingface.co/sarpba)'s
+Hungarian fine-tuned weights. The framework comes from PyPI and the weights from Hugging Face automatically;
+this repo only holds our own code, the pronunciation dictionary and the config.
 
-## Szerkesztőnek: telepítés és használat (Windows, NVIDIA kártyával)
+## Quick start (Windows, NVIDIA GPU)
 
-1. [Python 3.10–3.12](https://www.python.org/downloads/) telepítése, az **„Add python.exe to PATH”** pipával.
-2. A repo letöltése (zöld **Code → Download ZIP**, kicsomagolás), vagy `git clone`.
-3. Dupla katt: **`telepit.bat`** – egyszer kell, ~10 perc, letölti a modelleket (~2 GB).
-4. Dupla katt: **`bemondo.bat`** – megnyílik a böngészőben a felület.
-5. Szöveg beírása, hang kiválasztása, **Bemondás**. A kész WAV az `output/` mappába kerül, a felületről letölthető.
+1. Install [Python 3.10–3.12](https://www.python.org/downloads/) and tick **"Add python.exe to PATH"**.
+2. Get this repo: green **Code → Download ZIP** and unzip, or `git clone https://github.com/zsoca000/erd-tv-voice`.
+3. **Add a voice** (see below): put `ref.wav` and `ref.txt` into `voices/<name>/`. You get these files from the
+   project owner, or create them yourself.
+4. Double-click **`telepit.bat`** – one-time setup, ~10 min, downloads the models (~2 GB).
+5. Double-click **`bemondo.bat`** – the UI opens in your browser.
+6. Type the text, pick the voice, press **Bemondás**. The WAV lands in `output/` and can be downloaded from the UI.
 
-Számokat, időpontokat, dátumokat írj nyugodtan számmal: `19:30`, `2025. március 15.`, `M1`, `2-es`, `kb.`.
-A táblázatban a ⚠ jelű mondatokat hallgasd vissza: ott a gép visszahallott szövege eltért a beírttól.
+Write numbers, times and dates as digits: `19:30`, `2025. március 15.`, `M1`, `2-es`, `kb.` – they are expanded
+to spoken Hungarian automatically. In the result table, re-listen to sentences marked ⚠: there the machine
+heard something different from what you typed.
 
-**Frissítés:** új repo-verzió letöltése után ismét `telepit.bat`.
+**Update:** download the new version of the repo and run `telepit.bat` again.
 
-## Fejlesztőnek
+## Adding a voice
+
+Voices live in `voices/<name>/` and are **not committed** (they are private; `voices/` is git-ignored).
+Each voice is two files:
+
+| File | What |
+|---|---|
+| `voices/<name>/ref.wav` | 6–10 s of clean speech, mono, no music, ~0.5 s of silence at the end |
+| `voices/<name>/ref.txt` | the exact transcript of `ref.wav`, word for word, with punctuation |
+
+**Option A – you already have the two files:** copy the folder into `voices/`. Done.
+
+**Option B – make them from any recording** (a longer MP3/WAV of the person speaking):
+
+```bash
+.venv\Scripts\activate
+bemondo hang recording.mp3 --nev panna
+```
+
+This cuts a ≤10 s segment at a natural pause, normalises the volume, adds trailing silence, and writes a Whisper
+transcript to `voices/panna/ref.txt`. **Listen to `ref.wav` and correct `ref.txt` word for word** – a transcript
+that doesn't match the audio is the main cause of stray syllables in the output.
+
+Set the default voice in `config.yaml` (`voice: panna`).
+
+## CLI
+
+```bash
+bemondo hang <audio> --nev <name>   # prepare a voice (see above)
+bemondo norm "A híradó 19:30-kor."  # show how the text will be pronounced
+bemondo mond szoveg.txt -o out.wav  # generate (file or literal text)
+bemondo ui [--host 0.0.0.0]         # web UI; 0.0.0.0 makes it reachable on the LAN
+```
+
+## Developer setup
 
 ```bash
 python -m venv .venv && .venv\Scripts\activate
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124   # or plain `pip install torch` for CPU
 pip install -e . imageio-ffmpeg
-
-bemondo hang PANNA_HANG.mp3 --nev panna   # referencia: 6–10 s-os részlet + Whisper-átirat → voices/panna/
-                                          # utána: hallgasd meg a ref.wav-ot, javítsd a ref.txt-t szóról szóra!
-bemondo norm "A híradó 19:30-kor az M1-en." # normalizálás kipróbálása
-bemondo mond szoveg.txt -o output/hirado.wav
-bemondo ui [--host 0.0.0.0]               # felület; 0.0.0.0-val hálózatról is elérhető
 ```
 
-### Hogyan működik
+### How it works
 
 ```
-szöveg → mondatokra bontás → normalizálás (számok, rövidítések, kiejtési szótár)
-      → F5-TTS mondatonként (referencia-hang + szöveg, rögzített seed)
-      → Whisper visszahallgatja; ha eltér, új seeddel újra (max_tries), a legjobbat tartja
-      → összefűzés szünetekkel → WAV + .json (minden beállítás és seed, reprodukálható)
+text → sentence split → normalisation (numbers, abbreviations, pronunciation dictionary)
+     → F5-TTS per sentence (reference voice + text, fixed seed)
+     → Whisper transcribes the result; if it differs, retry with a new seed (max_tries), keep the best
+     → concatenate with pauses → WAV + .json (all settings and seeds; fully reproducible)
 ```
 
-A referenciát mi vágjuk 10 s alá, csendnél, záró csenddel; ezért nem kell az F5-TTS-nek vágnia, és a
-referenciaszöveg a hanghoz tartozik. (Ennek hiánya okozta a korábbi „random szótag” hibát.)
+We trim the reference ourselves (≤10 s, at a pause, trailing silence) so F5-TTS doesn't have to, and the
+reference transcript matches the audio. Missing this was what caused random syllables before.
 
-### Hol mit állíts
+### Where to change what
 
-| Mit | Hol |
+| What | Where |
 |---|---|
-| Modell, paraméterek, alap-hang, ellenőrzés szigorúsága | `config.yaml` |
-| Kiejtési szótár (rövidítések, idegen szavak) | `bemondo/normaliser/changes.csv` (`kulcs, kiejtés`) |
-| Hangok | `voices/<név>/ref.wav` + `ref.txt` |
+| Model, generation parameters, default voice, QA strictness | `config.yaml` |
+| Pronunciation dictionary (abbreviations, foreign words) | `bemondo/normaliser/changes.csv` (`key, pronunciation`) |
+| Voices | `voices/<name>/ref.wav` + `ref.txt` |
 
-### Frissítés
+### Updating
 
-- **F5-TTS:** `pyproject.toml`-ban a rögzített verzió emelése, tesztelés, commit.
-- **Új magyar modell:** `config.yaml` → `model.ckpt` / `model.vocab`, pl. `hf://sarpba/F5-TTS_V1_hun_2509/model_302000.with_EMA.safetensors`.
-- **Másik motor (pl. VibeVoice):** új osztály a `bemondo/engine.py`-ban ugyanazzal a `synth()` metódussal, majd `model.engine` a configban.
+- **F5-TTS:** bump the pinned version in `pyproject.toml`, test, commit.
+- **New Hungarian weights:** `config.yaml` → `model.ckpt` / `model.vocab`,
+  e.g. `hf://sarpba/F5-TTS_V1_hun_2509/model_302000.with_EMA.safetensors`.
+- **Another engine (e.g. VibeVoice):** add a class in `bemondo/engine.py` with the same `synth()` method,
+  select it via `model.engine` in the config.
 
-### Felépítés
+### Layout
 
 ```
 bemondo/
-  pipeline.py   a teljes folyamat (CLI és UI is ezt hívja)
-  text.py       mondatbontás, normalizálás hívása
-  normaliser/   magyar normalizáló (sarpba F5-TTS_hun-ból átvéve) + suffix.py (2-es, 12-kor, 100-an)
-  voice.py      referencia vágása, hangerő, záró csend
-  engine.py     F5-TTS nyilvános API (f5_tts.api.F5TTS); hf:// letöltés
-  qa.py         Whisper-visszaellenőrzés, hibaarány
-  ui.py         egyszerűsített Gradio felület
-  cli.py        parancsok
+  pipeline.py   the whole flow (used by both CLI and UI)
+  text.py       sentence split, normalisation entry point
+  normaliser/   Hungarian normaliser (from sarpba/F5-TTS_hun) + suffix.py (2-es, 12-kor, 100-an)
+  voice.py      reference trimming, loudness, trailing silence
+  engine.py     F5-TTS public API (f5_tts.api.F5TTS); hf:// downloads
+  qa.py         Whisper back-transcription, error rate
+  ui.py         simplified Gradio UI
+  cli.py        commands
+telepit.bat     one-time install (Windows)
+bemondo.bat     start the UI (Windows)
 ```
 
-Licenc: a magyar modellsúlyok CC-BY-NC-4.0 (nem kereskedelmi); az F5-TTS MIT.
+Licence: the Hungarian weights are CC-BY-NC-4.0 (non-commercial); F5-TTS is MIT.
