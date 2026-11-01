@@ -13,6 +13,7 @@ dependencies = [
     "soundfile",
     "numpy",
     "pyyaml",
+    "imageio-ffmpeg",      # ffmpeg bináris, ha a gépen nincs
 ]
 
 [project.scripts]

@@ -6,6 +6,7 @@ szótagok). Ezért itt mi vágunk, csendnél, és a szöveget a vágott részhez
 """
 
 import io
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,10 +16,19 @@ SAMPLE_RATE = 24000
 TAIL_SILENCE_MS = 500
 
 
+def ffmpeg_exe() -> str:
+    """Rendszerszintű ffmpeg, ha van; különben az imageio-ffmpeg csomagból (Windows-telepítő ezt teszi fel)."""
+    if shutil.which("ffmpeg"):
+        return "ffmpeg"
+    import imageio_ffmpeg
+
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
 def prepare_reference(src: Path, dest_dir: Path, max_sec: float = 10.0, min_sec: float = 5.0) -> Path:
     # ffmpeg-gel WAV-vá alakítunk, így a pydub-nak nem kell ffprobe
     wav = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(src), "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "wav", "-"],
+        [ffmpeg_exe(), "-v", "error", "-i", str(src), "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "wav", "-"],
         check=True, capture_output=True,
     ).stdout
     audio = AudioSegment.from_wav(io.BytesIO(wav))
