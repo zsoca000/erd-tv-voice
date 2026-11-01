@@ -40,7 +40,8 @@ def build(cfg):
         rows = [["✔" if r["ok"] else "⚠ ellenőrizd", r["text"], r.get("heard", "–"), f"{r.get('error', 0):.0%}"] for r in report]
         bad = sum(not r["ok"] for r in report)
         status = f"Kész: {out.name}" + (f" — {bad} mondatot hallgass vissza" if bad else " — minden mondat rendben")
-        return str(out), rows, status
+        # Tömböt adunk, nem fájlt: a fájlos út ffprobe-ot igényelne (pydub), ami Windows-gépen gyakran hiányzik
+        return (sr, wav), rows, status
 
     with gr.Blocks(title="Bemondó") as app:
         gr.Markdown("## Bemondó\nÍrd be a szöveget, válassz hangot, és nyomd meg a gombot. Számokat, időpontokat nyugodtan írj számmal (pl. 19:30, M1, 2025. március 15.).")
@@ -51,7 +52,7 @@ def build(cfg):
                 voice = gr.Dropdown(voices, value=cfg["voice"] if cfg["voice"] in voices else (voices[0] if voices else None), label="Hang")
                 btn = gr.Button("Bemondás", variant="primary")
                 status = gr.Markdown()
-        audio = gr.Audio(label="Eredmény", type="filepath", interactive=False)
+        audio = gr.Audio(label="Eredmény", type="numpy", interactive=False)
         table = gr.Dataframe(headers=["", "Mondat", "Amit a gép visszahallott", "Eltérés"], interactive=False, wrap=True, label="Ellenőrzés")
         btn.click(run, [text, voice], [audio, table, status])
     return app
