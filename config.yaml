@@ -17,7 +17,9 @@ generation:
   sway_sampling_coef: -1.0
   speed: 1.0
   seed: 42                     # rögzített seed = megismételhető eredmény
-  pause_sec: 0.35              # szünet a mondatok között
+  chunk_chars: 150             # ennyi karakterig vonja össze a mondatokat egy darabba (folyamatos prozódia);
+                               # 0 = minden mondat külön (tagoltabb, de rövidebb darabok, biztosabb ellenőrzés)
+  pause_sec: 0.2               # szünet a darabok között
 
 qa:
   enabled: true

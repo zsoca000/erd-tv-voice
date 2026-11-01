@@ -34,6 +34,23 @@ DOT = "\u0001"  # ideiglenes jel a rövidítések pontja helyett
 ABBREVIATIONS = ["dr", "kb", "pl", "stb", "ill", "ifj", "id", "özv", "u", "tel", "kft", "zrt", "bt", "ún", "máj", "jan", "febr", "márc", "ápr", "jún", "júl", "aug", "szept", "okt", "nov", "dec"]
 
 
+def group_sentences(sentences: list[str], max_chars: int) -> list[str]:
+    """Mondatok összevonása legfeljebb max_chars hosszú darabokba, hogy a prozódia folyamatos maradjon.
+    max_chars <= 0: minden mondat külön."""
+    if max_chars <= 0:
+        return list(sentences)
+    chunks, current = [], ""
+    for s in sentences:
+        if current and len(current) + 1 + len(s) > max_chars:
+            chunks.append(current)
+            current = s
+        else:
+            current = f"{current} {s}".strip()
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def compare_key(text: str) -> str:
     """Összehasonlításhoz: csak betűk és szóközök, kisbetűvel."""
     text = normalize_text(text, prefix=False)

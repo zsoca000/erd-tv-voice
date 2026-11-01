@@ -13,7 +13,7 @@ import soundfile as sf
 import yaml
 
 from bemondo.engine import load_engine
-from bemondo.text import normalize_text, split_sentences
+from bemondo.text import group_sentences, normalize_text, split_sentences
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -50,7 +50,7 @@ class Bemondo:
         ref_wav = voice_dir / "ref.wav"
         ref_text = normalize_text((voice_dir / "ref.txt").read_text(encoding="utf-8").strip(), prefix=False)
 
-        sentences = split_sentences(text)
+        sentences = group_sentences(split_sentences(text), gen.get("chunk_chars", 0))
         pause = np.zeros(int(gen["pause_sec"] * self.sr), dtype=np.float32)
         pieces, report = [], []
         for i, sentence in enumerate(sentences, 1):
