@@ -22,11 +22,12 @@ Update: download the new version, run `telepit.bat` again.
 
 A voice is a folder `voices/<name>/` with two files (not committed – they are private):
 
-- `ref.wav` – 6–10 s of clean speech, mono, ~0.5 s silence at the end
-- `ref.txt` – exact transcript of `ref.wav`, word for word
+- `ref.wav` (or `ref.mp3` / `ref.m4a` / `ref.flac`) – 6–10 s of clean speech, **max 12 s**, no music
+- `ref.txt` – exact transcript of the audio, word for word
 
-To make one from any recording: `bemondo hang recording.mp3 --nev <name>`, then listen to the produced `ref.wav`
-and fix `ref.txt` by hand. Default voice: `voice:` in `config.yaml`.
+A new folder shows up in the UI after pressing ↻ next to the voice list. If the recording is longer than 12 s,
+make a reference from it: `bemondo hang recording.mp3 --nev <name>` – it cuts a ≤10 s segment and writes a
+Whisper transcript; listen to the produced `ref.wav` and fix `ref.txt` by hand. Default voice: `voice:` in `config.yaml`.
 
 ## Developer
 

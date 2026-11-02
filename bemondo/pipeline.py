@@ -25,7 +25,32 @@ def load_config(path: Path | None = None) -> dict:
 
 def list_voices() -> list[str]:
     vdir = ROOT / "voices"
-    return sorted(p.name for p in vdir.iterdir() if (p / "ref.wav").exists() and (p / "ref.txt").exists())
+    if not vdir.exists():
+        return []
+    from bemondo.voice import find_ref_audio
+
+    return sorted(p.name for p in vdir.iterdir() if p.is_dir() and find_ref_audio(p) and (p / "ref.txt").exists())
+
+
+def incomplete_voices() -> list[str]:
+    """Mappák a voices/ alatt, amikből hiányzik a hang vagy a ref.txt – a felület kiírja, miért nem látszanak."""
+    from bemondo.voice import find_ref_audio
+
+    vdir = ROOT / "voices"
+    if not vdir.exists():
+        return []
+    out = []
+    for p in sorted(vdir.iterdir()):
+        if not p.is_dir():
+            continue
+        missing = []
+        if not find_ref_audio(p):
+            missing.append("ref.wav/ref.mp3")
+        if not (p / "ref.txt").exists():
+            missing.append("ref.txt")
+        if missing:
+            out.append(f"{p.name}: hiányzik {', '.join(missing)}")
+    return out
 
 
 class Bemondo:
@@ -46,8 +71,10 @@ class Bemondo:
         from bemondo.qa import error_rate
 
         gen, qa_cfg = self.cfg["generation"], self.cfg["qa"]
+        from bemondo.voice import ensure_ref_wav
+
         voice_dir = ROOT / "voices" / voice
-        ref_wav = voice_dir / "ref.wav"
+        ref_wav = ensure_ref_wav(voice_dir)  # ref.mp3-ból is készít ref.wav-ot, ha kell
         ref_text = normalize_text((voice_dir / "ref.txt").read_text(encoding="utf-8").strip(), prefix=False)
 
         sentences = group_sentences(split_sentences(text), gen.get("chunk_chars", 0))

@@ -8,7 +8,7 @@ import threading
 
 import gradio as gr
 
-from bemondo.pipeline import Bemondo, list_voices, load_config
+from bemondo.pipeline import Bemondo, incomplete_voices, list_voices, load_config
 
 _engine = None
 _lock = threading.Lock()
@@ -23,12 +23,20 @@ def get_engine(cfg):
 
 
 def build(cfg):
-    voices = list_voices()
+    def voice_choices(current=None):
+        """A voices/ mappát minden alkalommal újraolvassa, így egy új hang újraindítás nélkül megjelenik."""
+        voices = list_voices()
+        value = current if current in voices else (cfg["voice"] if cfg["voice"] in voices else (voices[0] if voices else None))
+        bad = incomplete_voices()
+        note = ("⚠ Hiányos hangmappa: " + "; ".join(bad)) if bad else ""
+        return gr.update(choices=voices, value=value), note
 
     def run(text, voice, progress=gr.Progress()):
         text = (text or "").strip()
         if not text:
             raise gr.Error("Írj be szöveget.")
+        if not voice or voice not in list_voices():
+            raise gr.Error("Válassz hangot. Új hang: voices/<név>/ref.wav + ref.txt, aztán a ↻ gomb.")
         progress(0, desc="Modell betöltése…")
         bem = get_engine(cfg)
 
@@ -49,12 +57,16 @@ def build(cfg):
             with gr.Column(scale=3):
                 text = gr.Textbox(label="Szöveg", lines=8, placeholder="Jó estét kívánunk! Következik a híradó…")
             with gr.Column(scale=1):
-                voice = gr.Dropdown(voices, value=cfg["voice"] if cfg["voice"] in voices else (voices[0] if voices else None), label="Hang")
+                with gr.Row():
+                    voice = gr.Dropdown([], label="Hang", scale=4)
+                    refresh = gr.Button("↻", scale=1, min_width=40)
                 btn = gr.Button("Bemondás", variant="primary")
                 status = gr.Markdown()
         audio = gr.Audio(label="Eredmény", type="numpy", interactive=False)
         table = gr.Dataframe(headers=["", "Mondat", "Amit a gép visszahallott", "Eltérés"], interactive=False, wrap=True, label="Ellenőrzés")
         btn.click(run, [text, voice], [audio, table, status])
+        app.load(voice_choices, [voice], [voice, status])
+        refresh.click(voice_choices, [voice], [voice, status])
     return app
 
 
