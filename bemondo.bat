@@ -9,5 +9,5 @@ if not exist .venv\Scripts\activate.bat (
 call .venv\Scripts\activate.bat
 echo Bemondo indul, a bongeszoben megnyilik: http://127.0.0.1:7860
 echo (Ezt az ablakot hagyd nyitva, amig dolgozol.)
-bemondo ui
+python -m bemondo.cli ui
 pause
