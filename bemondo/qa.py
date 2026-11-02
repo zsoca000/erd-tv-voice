@@ -9,11 +9,40 @@ import soundfile as sf
 from bemondo.text import compare_key
 
 
+def _add_torch_dlls():
+    """Windows: a CTranslate2 (faster-whisper) a cuBLAS/cuDNN DLL-eket a PATH-on keresi; a PyTorch csomag
+    hozza őket, csak a saját mappájában. Ezt vesszük fel a DLL-keresési útba."""
+    import os
+    import sys
+
+    if sys.platform != "win32":
+        return
+    try:
+        import torch
+
+        lib = os.path.join(os.path.dirname(torch.__file__), "lib")
+        if os.path.isdir(lib):
+            os.add_dll_directory(lib)
+            os.environ["PATH"] = lib + os.pathsep + os.environ.get("PATH", "")
+    except Exception:
+        pass
+
+
 class Transcriber:
     def __init__(self, model_name: str):
+        _add_torch_dlls()
         from faster_whisper import WhisperModel
 
         self.model = WhisperModel(model_name, device="auto", compute_type="default")
+        # A GPU-s út csak az első futtatásnál derül ki (lazy); itt próbáljuk ki, és ha nem megy, CPU-ra váltunk.
+        try:
+            list(self.model.transcribe(np.zeros(16000, dtype=np.float32), language="hu", beam_size=1)[0])
+        except RuntimeError as e:
+            if "cublas" in str(e).lower() or "cudnn" in str(e).lower() or "cuda" in str(e).lower():
+                print(f"Figyelem: a Whisper nem tud GPU-n futni ({e}); CPU-n folytatom, lassabb lesz.")
+                self.model = WhisperModel(model_name, device="cpu", compute_type="int8")
+            else:
+                raise
 
     def transcribe(self, audio, sample_rate: int = 16000) -> str:
         """audio: fájlútvonal vagy float32 tömb (ekkor sample_rate szerint 16 kHz-re hozzuk)."""
