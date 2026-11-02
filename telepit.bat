@@ -2,6 +2,7 @@
 chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
+set HF_HUB_DISABLE_SYMLINKS_WARNING=1
 echo === Bemondo telepites ===
 echo.
 
