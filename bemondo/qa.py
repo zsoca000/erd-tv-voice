@@ -27,26 +27,13 @@ class Transcriber:
         segments, _ = self.model.transcribe(audio, language="hu", beam_size=5, vad_filter=False)
         return " ".join(s.text.strip() for s in segments)
 
-    def sentences_with_times(self, path) -> list[tuple[float, float, str]]:
-        """Mondatok (kezdet, vég, szöveg) másodpercben, szó-időbélyegekből; a referencia vágásához."""
-        import re
-
+    def words_with_times(self, path) -> list[tuple[float, float, str]]:
+        """Szavak (kezdet, vég, szó) másodpercben, írásjelekkel együtt; a referencia vágásához."""
         audio, sr = sf.read(str(path), dtype="float32")
         if audio.ndim > 1:
             audio = audio.mean(axis=1)
         segments, _ = self.model.transcribe(audio if sr == 16000 else self._to16k(audio, sr), language="hu", beam_size=5, word_timestamps=True)
-        out, words, start = [], [], None
-        for seg in segments:
-            for w in seg.words or []:
-                if start is None:
-                    start = w.start
-                words.append(w.word)
-                if re.search(r"[.!?…]$", w.word.strip()):
-                    out.append((start, w.end, "".join(words).strip()))
-                    words, start = [], None
-        if words:
-            out.append((start, seg.words[-1].end, "".join(words).strip()))
-        return out
+        return [(w.start, w.end, w.word) for seg in segments for w in (seg.words or [])]
 
     @staticmethod
     def _to16k(audio, sr):

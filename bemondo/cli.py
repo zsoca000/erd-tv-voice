@@ -12,6 +12,8 @@ from pathlib import Path
 
 from bemondo.pipeline import ROOT, Bemondo, load_config
 
+MIN_REF_SEC = 6.0  # ennél rövidebb referencia helyett inkább tagmondat-határig megyünk
+
 
 def cmd_hang(args, cfg):
     from bemondo.qa import Transcriber
@@ -25,19 +27,31 @@ def cmd_hang(args, cfg):
     src = Path(args.hangfajl)
     transcriber = Transcriber(cfg["qa"]["whisper_model"])
 
-    # 1. A teljes felvétel mondatai időbélyeggel, hogy mondatvégnél vágjunk
+    # A teljes felvétel szavai időbélyeggel: az utolsó mondatvégnél vágunk, ami a korlátba fér.
+    # Ha az túl rövid darabot adna, tagmondat-határ (vessző) is jó.
+    import re
+
     with tempfile.TemporaryDirectory() as tmp:
         full = Path(tmp) / "full.wav"
         _load_mono(src).export(full, format="wav")
-        sentences = transcriber.sentences_with_times(full)
-    fitting = [s for s in sentences if s[1] <= args.max]
-    if fitting:
-        cut = fitting[-1][1]
-        text = " ".join(s[2] for s in fitting)
-        print(f"Vágás az utolsó mondatvégnél: {cut:.1f} s ({len(fitting)} mondat)")
+        words = transcriber.words_with_times(full)
+
+    def last_cut(pattern, min_sec=0.0):
+        idx = [i for i, (_, end, w) in enumerate(words) if end <= args.max and end >= min_sec and re.search(pattern, w.strip())]
+        return idx[-1] if idx else None
+
+    i = None
+    for pattern, min_sec in ((r"[.!?…]$", MIN_REF_SEC), (r"[.!?…,;:]$", MIN_REF_SEC), (r"[.!?…]$", 0.0)):
+        i = last_cut(pattern, min_sec)
+        if i is not None:
+            break
+    if i is not None:
+        cut = words[i][1]
+        text = "".join(w for _, _, w in words[: i + 1]).strip()
+        print(f"Vágás: {cut:.1f} s, itt: „…{text[-40:]}”")
         ref = prepare_reference(src, dest, max_sec=args.max, cut_sec=cut)
     else:
-        print(f"Figyelem: az első mondat is hosszabb {args.max:.0f} s-nál, csendnél vágok.")
+        print(f"Figyelem: nincs mondat- vagy tagmondat-határ {args.max:.0f} s-on belül, csendnél vágok.")
         ref = prepare_reference(src, dest, max_sec=args.max)
         text = transcriber.transcribe(str(ref))
 
