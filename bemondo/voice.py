@@ -70,8 +70,16 @@ def _load_mono(src: Path) -> AudioSegment:
     return AudioSegment.from_wav(io.BytesIO(wav))
 
 
-def prepare_reference(src: Path, dest_dir: Path, max_sec: float = 10.0, min_sec: float = 5.0) -> Path:
+def prepare_reference(src: Path, dest_dir: Path, max_sec: float = 10.0, min_sec: float = 5.0, cut_sec: float | None = None) -> Path:
+    """cut_sec: ha adott (pl. Whisper szerinti mondatvég), ott vágunk; különben csendnél."""
     audio = _load_mono(src)
+
+    if cut_sec is not None:
+        start, end = 0, int(cut_sec * 1000)
+        # kezdő csend levágása
+        lead = silence.detect_leading_silence(audio, silence_threshold=audio.dBFS - 16)
+        start = max(0, lead - 100)
+        return _export(audio[start:end + 50], dest_dir)
 
     # Beszédszakaszok csendek mentén; addig gyűjtünk, amíg beférünk max_sec-be.
     ranges = silence.detect_nonsilent(audio, min_silence_len=250, silence_thresh=audio.dBFS - 16, seek_step=10)
@@ -87,10 +95,12 @@ def prepare_reference(src: Path, dest_dir: Path, max_sec: float = 10.0, min_sec:
     if (end - start) / 1000 > max_sec:  # egyetlen hosszú szakasz, nincs csend benne
         end = start + int(max_sec * 1000)
 
-    clip = audio[max(0, start - 100):end + 50]
+    return _export(audio[max(0, start - 100):end + 50], dest_dir)
+
+
+def _export(clip: AudioSegment, dest_dir: Path) -> Path:
     clip = clip.apply_gain(-20.0 - clip.dBFS)  # egységes hangerő
     clip += AudioSegment.silent(TAIL_SILENCE_MS, frame_rate=SAMPLE_RATE)
-
     dest_dir.mkdir(parents=True, exist_ok=True)
     out = dest_dir / "ref.wav"
     clip.export(out, format="wav")

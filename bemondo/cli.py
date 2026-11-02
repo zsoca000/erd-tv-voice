@@ -17,9 +17,30 @@ def cmd_hang(args, cfg):
     from bemondo.qa import Transcriber
     from bemondo.voice import prepare_reference
 
+    import tempfile
+
+    from bemondo.voice import _load_mono
+
     dest = ROOT / "voices" / args.nev
-    ref = prepare_reference(Path(args.hangfajl), dest, max_sec=args.max)
-    text = Transcriber(cfg["qa"]["whisper_model"]).transcribe(str(ref))
+    src = Path(args.hangfajl)
+    transcriber = Transcriber(cfg["qa"]["whisper_model"])
+
+    # 1. A teljes felvétel mondatai időbélyeggel, hogy mondatvégnél vágjunk
+    with tempfile.TemporaryDirectory() as tmp:
+        full = Path(tmp) / "full.wav"
+        _load_mono(src).export(full, format="wav")
+        sentences = transcriber.sentences_with_times(full)
+    fitting = [s for s in sentences if s[1] <= args.max]
+    if fitting:
+        cut = fitting[-1][1]
+        text = " ".join(s[2] for s in fitting)
+        print(f"Vágás az utolsó mondatvégnél: {cut:.1f} s ({len(fitting)} mondat)")
+        ref = prepare_reference(src, dest, max_sec=args.max, cut_sec=cut)
+    else:
+        print(f"Figyelem: az első mondat is hosszabb {args.max:.0f} s-nál, csendnél vágok.")
+        ref = prepare_reference(src, dest, max_sec=args.max)
+        text = transcriber.transcribe(str(ref))
+
     (dest / "ref.txt").write_text(text + "\n", encoding="utf-8")
     print(f"Átirat: {text}")
     print(f"FONTOS: hallgasd meg a {ref} fájlt, és javítsd a {dest / 'ref.txt'} szövegét szóról szóra.")
